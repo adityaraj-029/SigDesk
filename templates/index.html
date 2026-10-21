@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d2b2a">
+  <meta name="description" content="An interactive demonstration of digital signatures and X.509 certificates.">
+  <title>SigDesk Nova — Trust, Signed.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#0d2b2a;--ink2:#15423f;--teal:#1f7a70;--teal-soft:#7fd0c2;
+      --paper:#eef2ec;--card:#fbfcfa;--mint:#dfece6;--line:#c2d1c9;--line2:#dce6e0;
+      --text:#14272a;--muted:#4c6266;--gold:#b88a2c;--gold-lt:#e6c777;
+      --green:#1a7a4c;--green-bg:#dff1e7;--red:#bf3a2c;--red-bg:#fbe3df;--amber:#9a6a12;--amber-bg:#f8ecd2;
+      --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+      --sans:'Figtree','Segoe UI',system-ui,sans-serif;
+      --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+      /* interlaced-wave "security print" tile, used on bands and panel headers */
+      --waves:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='1'%3E%3Cpath d='M0 12C20-4 60 28 80 12'/%3E%3Cpath d='M0 12C20 28 60-4 80 12'/%3E%3Cpath d='M0 36C20 20 60 52 80 36'/%3E%3Cpath d='M0 36C20 52 60 20 80 36'/%3E%3C/g%3E%3C/svg%3E");
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth;overflow-x:clip}
+    body{margin:0;min-height:100vh;overflow-x:clip;background:var(--paper);color:var(--text);font:18px/1.65 var(--sans)}
+    button,textarea,input{font:inherit}
+    button{cursor:pointer}
+    button:disabled{opacity:.6;cursor:wait}
+    :focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+    ::selection{background:var(--gold-lt);color:var(--ink)}
+    .hide{display:none!important}
+    .shell{width:min(1360px,100% - 64px);margin:0 auto}
+
+    /* ---------- Header band ---------- */
+    .band{position:relative;background:var(--ink);color:#f3f7f4;overflow:hidden}
+    .band:before{content:'';position:absolute;inset:0;background:var(--waves);opacity:.05}
+    .band:after{content:'';position:absolute;left:0;right:0;bottom:0;height:18px;background:var(--waves) center/80px 48px,var(--ink2);opacity:.9;border-top:2px solid var(--gold)}
+    .band .shell{position:relative;z-index:1}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:26px 0 18px;border-bottom:1px solid rgba(230,199,119,.25)}
+    .brand{display:flex;align-items:center;gap:14px}
+    .brand-mark{width:50px;height:50px;border-radius:50%;border:2px solid var(--gold-lt);display:grid;place-items:center;box-shadow:0 0 0 4px rgba(230,199,119,.14)}
+    .brand-mark svg{width:26px;height:26px}
+    .brand-name{font:800 28px/1 var(--display);letter-spacing:-.5px}
+    .brand-name span{color:var(--gold-lt)}
+    .brand-caption{font-size:15px;color:#b4cbc6;margin-top:5px}
+    .live-pill{display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(230,199,119,.45);background:rgba(255,255,255,.06);border-radius:999px;padding:9px 18px;font-size:16px;font-weight:600;color:#f3f7f4}
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--gold-lt);box-shadow:0 0 0 4px rgba(230,199,119,.2)}
+    .live-pill.ready .dot{background:#5fe0a1;box-shadow:0 0 0 4px rgba(95,224,161,.22)}
+
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) 340px;align-items:center;gap:40px;padding:48px 0 70px}
+    .hero h1{font:800 clamp(52px,7vw,92px)/.98 var(--display);letter-spacing:-3px;margin:0 0 22px}
+    .hero p{margin:0;max-width:700px;font-size:21px;line-height:1.7;color:#c4d8d3}
+    .hero p b{color:#fff;font-weight:600}
+    .rosette{width:100%;height:auto;display:block;filter:drop-shadow(0 0 30px rgba(230,199,119,.18));animation:spin 160s linear infinite}
+    .rosette text{animation:none}
+    .rosette-wrap{position:relative;justify-self:end;width:min(340px,100%)}
+    .rosette-wrap figcaption{text-align:center;margin-top:8px;font-size:15px;color:#b4cbc6}
+    .rosette-wrap{margin:0}
+
+    /* ---------- Steps ---------- */
+    .steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:-34px 0 26px;position:relative;z-index:2;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:6px;box-shadow:0 14px 34px rgba(13,43,42,.12)}
+    .step{display:flex;align-items:center;gap:16px;padding:20px 24px;min-width:0;border-left:1px solid var(--line2);transition:background .2s}
+    .step:first-child{border-left:0}
+    .step-num{width:46px;height:46px;flex:none;display:grid;place-items:center;border-radius:50%;border:2px solid var(--line);color:var(--muted);font:700 20px var(--display);background:var(--card);box-shadow:0 0 0 4px var(--paper)}
+    .step strong{display:block;font:700 19px/1.2 var(--display)}
+    .step small{display:block;color:var(--muted);font-size:16px;margin-top:3px}
+    .step.active{background:var(--mint)}
+    .step.active .step-num{background:var(--ink2);border-color:var(--gold);color:#fff;box-shadow:0 0 0 4px var(--gold-lt)}
+
+    /* ---------- Feature row ---------- */
+    .features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px;margin:0 0 30px;padding:0 6px}
+    .feature{display:flex;align-items:flex-start;gap:14px;min-width:0}
+    .feature-icon{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--teal);background:var(--mint);border:1px solid var(--line)}
+    .feature-icon svg{width:22px;height:22px}
+    .feature strong{display:block;font:700 18px/1.3 var(--display)}
+    .feature small{display:block;color:var(--muted);font-size:16px;margin-top:2px}
+
+    /* ---------- Chain of trust ---------- */
+    .trust-lab{margin:0 0 30px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:6px;padding:26px 28px;box-shadow:0 8px 24px rgba(13,43,42,.06)}
+    .lab-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}
+    .lab-heading h2{font:800 26px/1.2 var(--display);margin:0;letter-spacing:-.4px}
+    .lab-heading p{margin:5px 0 0;color:var(--muted);font-size:17px}
+    .trust-flow{display:grid;grid-template-columns:minmax(0,1fr) 80px minmax(0,1fr) 80px minmax(0,1fr);align-items:center;gap:10px}
+    .trust-node{min-width:0;display:flex;align-items:center;gap:14px;padding:16px 18px;border:2px solid var(--line);border-radius:8px;background:var(--paper);transition:border-color .25s,background .25s}
+    .trust-node.ready{border-color:var(--green);background:var(--green-bg)}
+    .trust-node.pulse{animation:pulse .8s ease}
+    .trust-icon{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;color:var(--ink2);background:#fff;border:1px solid var(--line)}
+    .trust-icon svg{width:22px;height:22px}
+    .trust-node strong{display:block;font:700 18px/1.25 var(--display)}
+    .trust-node small{display:block;color:var(--muted);font-size:15px;margin-top:2px}
+    .flow-line{height:4px;position:relative;background:var(--line);overflow:hidden;border-radius:4px}
+    .flow-line:after{content:'';position:absolute;top:0;bottom:0;left:-45%;width:45%;background:linear-gradient(90deg,transparent,var(--teal),transparent)}
+    .trust-lab.flowing .flow-line:after{animation:packet 1.1s ease-in-out infinite}
+    .trust-lab.flowing .flow-line:nth-of-type(2):after{animation-delay:.25s}
+    .flow-caption{display:flex;justify-content:space-between;gap:10px;margin-top:14px;color:var(--muted);font-size:15px}
+
+    /* ---------- Panels ---------- */
+    .workspace{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.04fr) minmax(0,1.04fr);gap:22px;align-items:stretch;padding-bottom:34px}
+    .panel{min-width:0;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:6px;box-shadow:0 12px 30px rgba(13,43,42,.08);overflow:hidden}
+    .panel-top{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px;background:var(--ink2);color:#f3f7f4;overflow:hidden}
+    .panel-top:before{content:'';position:absolute;inset:0;background:var(--waves);opacity:.07}
+    .panel-top>*{position:relative}
+    .panel-title{display:flex;align-items:center;gap:14px;min-width:0}
+    .panel-icon{width:50px;height:50px;flex:none;display:grid;place-items:center;border-radius:50%;border:2px solid var(--gold-lt);box-shadow:0 0 0 4px rgba(230,199,119,.14);color:var(--gold-lt)}
+    .panel-icon svg{width:24px;height:24px}
+    .panel-index{font-size:15px;color:#b4cbc6;line-height:1.2}
+    .panel h2{font:800 24px/1.15 var(--display);letter-spacing:-.4px;margin:2px 0 0}
+    .panel-inner{padding:24px}
+    .panel-desc{color:var(--muted);font-size:18px;line-height:1.7;margin:0 0 22px;min-height:92px}
+    .panel-divider{height:1px;background:var(--line2);margin:22px 0}
+    .field-label{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:17px;font-weight:700;margin:0 0 9px;color:var(--ink)}
+    .field-label span{font:400 15px var(--mono);color:var(--muted)}
+    textarea{display:block;width:100%;min-height:130px;resize:vertical;background:#fff;border:2px solid var(--line);border-radius:6px;padding:15px 16px;color:var(--text);font-size:18px;line-height:1.6;transition:border-color .2s,box-shadow .2s}
+    textarea::placeholder{color:#7a8d90}
+    textarea:focus{outline:0;border-color:var(--teal);box-shadow:0 0 0 4px rgba(31,122,112,.16)}
+
+    .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:12px 20px;border-radius:6px;border:2px solid transparent;font-size:17px;font-weight:700;transition:background .18s,border-color .18s,transform .18s,box-shadow .18s}
+    .btn svg{width:20px;height:20px;flex:none}
+    .btn-primary{background:var(--ink2);color:#fff;border-color:var(--ink2);box-shadow:0 4px 0 var(--gold)}
+    .btn-primary:hover:not(:disabled){background:var(--teal);border-color:var(--teal);transform:translateY(-2px);box-shadow:0 6px 0 var(--gold)}
+    .btn-primary:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 var(--gold)}
+    .btn-secondary{background:#fff;color:var(--ink);border-color:var(--ink2)}
+    .btn-secondary:hover{background:var(--mint)}
+    .btn-quiet{background:transparent;color:var(--muted);border:2px dashed var(--line)}
+    .btn-quiet:hover{color:var(--ink);border-color:var(--teal);background:var(--mint)}
+    .btn-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+    .btn-row .btn{flex:1}
+    .btn-full{width:100%;margin-top:16px}
+    .error{color:var(--red);font-size:16px;font-weight:600;margin-top:12px}
+    .error:empty{display:none}
+    .helper{color:var(--muted);font-size:15px;margin-top:11px}
+
+    .cert-stack{display:grid;gap:16px;margin-top:22px}
+    .cert{position:relative;border:1px solid var(--line);border-radius:6px;background:#fff;padding:18px 18px 14px;box-shadow:inset 0 0 0 5px var(--card),inset 0 0 0 6px var(--line2)}
+    .cert.ca{background:var(--mint)}
+    .cert-title{display:flex;align-items:center;flex-wrap:wrap;gap:10px;font:700 18px/1.3 var(--display);margin:0 6px 12px}
+    .cert-badge{font:500 13px var(--mono);padding:3px 9px;border-radius:999px;background:var(--ink2);color:var(--gold-lt)}
+    .cert-grid{display:grid;grid-template-columns:92px minmax(0,1fr);gap:7px 12px;font-size:16px;line-height:1.5;margin:0 6px}
+    .cert-grid dt{color:var(--muted)}
+    .cert-grid dd{margin:0;overflow-wrap:anywhere;font-weight:500}
+    .download{display:inline-flex;align-items:center;gap:8px;margin:14px 6px 0;color:var(--teal);text-decoration:none;font-size:16px;font-weight:700}
+    .download:hover{text-decoration:underline}
+    .download svg{width:18px;height:18px}
+
+    .output{margin-top:22px;animation:fade .3s ease}
+    .output-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+    .output-head .field-label{margin:0}
+    .mini-tag{font:400 14px var(--mono);color:var(--muted)}
+    .mono{font:400 15px/1.7 var(--mono);color:var(--ink);background:var(--mint);border:1px solid var(--line);border-radius:6px;padding:14px;overflow-wrap:anywhere;word-break:break-word;max-height:160px;overflow:auto;scrollbar-width:thin}
+    .mono.hash{color:var(--teal)}
+    .check-label{display:flex;align-items:flex-start;gap:12px;margin-top:18px;padding:14px 16px;font-size:17px;line-height:1.5;color:var(--muted);background:var(--amber-bg);border:1px solid #e7d3a0;border-radius:6px;cursor:pointer}
+    .check-label strong{color:var(--ink)}
+    .check-label input{accent-color:var(--ink2);margin-top:4px;flex:none;width:20px;height:20px}
+
+    .status-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 14px;font-size:15px;font-weight:700;white-space:nowrap;background:rgba(255,255,255,.1);color:#d4e4e0;border:1px solid rgba(255,255,255,.28)}
+    .status-pill:before{content:'';width:9px;height:9px;border-radius:50%;background:currentColor}
+    .status-pill.good{background:var(--green-bg);color:var(--green);border-color:#9fd5b7}
+    .status-pill.bad{background:var(--red-bg);color:var(--red);border-color:#e9a79f}
+    .status-pill.busy{background:var(--amber-bg);color:var(--amber);border-color:#e7d3a0}
+    .trust-lab .status-pill,.timeline .status-pill{background:var(--mint);color:var(--muted);border-color:var(--line)}
+
+    .result-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .tag{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:5px 14px;font-size:15px;font-weight:600;background:var(--mint);color:var(--muted);border:1px solid var(--line)}
+    .verify-box{margin-top:20px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:18px;box-shadow:inset 0 0 0 5px var(--card),inset 0 0 0 6px var(--line2)}
+    .verify-column+.results-column{margin-top:0}
+    .seal{display:none;place-items:center;text-align:center;width:168px;height:168px;border:5px double currentColor;border-radius:50%;margin:24px auto 12px;transform:rotate(-10deg);font:800 30px/1 var(--display);letter-spacing:1px;background:radial-gradient(circle,transparent 62%,currentColor 63%,transparent 64%) ,transparent}
+    .seal.show{display:grid;animation:stamp .4s cubic-bezier(.2,1.5,.4,1)}
+    .seal small{display:block;font:600 15px var(--sans);letter-spacing:0;margin-top:8px;padding:0 14px}
+    .seal.ok{color:var(--green)}
+    .seal.no{color:var(--red)}
+    .checks{list-style:none;padding:0;margin:16px 0 0}
+    .checks li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:2px 10px;padding:14px 0;border-top:1px solid var(--line2);animation:fade .28s both}
+    .checks li:nth-child(2){animation-delay:.05s}.checks li:nth-child(3){animation-delay:.1s}.checks li:nth-child(4){animation-delay:.15s}
+    .check-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;font-size:16px;font-weight:800}
+    .check-mark.ok{color:var(--green);background:var(--green-bg)}
+    .check-mark.no{color:var(--red);background:var(--red-bg)}
+    .checks strong{font-size:17px;font-weight:700;line-height:1.35}
+    .checks small{grid-column:2;color:var(--muted);font-size:16px;line-height:1.5}
+    .empty-state{display:grid;place-items:center;text-align:center;min-height:170px;color:var(--muted);padding:22px}
+    .empty-icon{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;margin:0 auto 12px;border:2px dashed var(--line);background:var(--paper);color:var(--teal)}
+    .empty-icon svg{width:26px;height:26px}
+    .empty-state strong{font:700 19px var(--display);color:var(--ink)}
+    .empty-state p{font-size:16px;max-width:260px;margin:6px auto 0}
+
+    /* ---------- Timeline ---------- */
+    .timeline{margin:0 0 44px;padding:26px 28px;background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(13,43,42,.06)}
+    .timeline-head{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:24px}
+    .timeline-head h2{font:800 26px/1.2 var(--display);margin:0;letter-spacing:-.4px}
+    .timeline-head p{font-size:17px;color:var(--muted);margin:5px 0 0}
+    .timeline-track{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+    .timeline-event{position:relative;padding-right:20px;min-width:0}
+    .timeline-event:not(:last-child):after{content:'';position:absolute;left:30px;right:6px;top:12px;border-top:3px dotted var(--line)}
+    .event-dot{position:relative;z-index:1;display:block;width:26px;height:26px;border:4px solid var(--line);border-radius:50%;background:var(--card);margin-bottom:14px;transition:all .25s}
+    .timeline-event.done .event-dot{border-color:var(--green);background:var(--green);box-shadow:0 0 0 4px var(--green-bg)}
+    .timeline-event.current .event-dot{border-color:var(--gold);box-shadow:0 0 0 5px rgba(184,138,44,.22)}
+    .timeline-event strong{display:block;font:700 19px/1.3 var(--display)}
+    .timeline-event small{display:block;color:var(--muted);font-size:16px;margin-top:4px;line-height:1.55}
+    .timeline-event time{display:block;color:var(--muted);font:400 14px var(--mono);margin-top:10px}
+    .timeline-event.done time{color:var(--green);font-weight:500}
+
+    .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:3px double var(--line);padding:22px 0 30px;color:var(--muted);font-size:16px}
+    .foot strong{color:var(--ink)}
+    .toast{position:fixed;right:24px;bottom:24px;z-index:10;max-width:min(420px,calc(100vw - 32px));padding:16px 20px;border-radius:6px;background:var(--ink);color:#f3f7f4;border-left:5px solid var(--gold-lt);box-shadow:0 16px 44px rgba(0,0,0,.3);font-size:17px;opacity:0;transform:translateY(10px);pointer-events:none;transition:opacity .2s,transform .2s}
+    .toast.show{opacity:1;transform:none}
+
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+    @keyframes stamp{from{transform:rotate(-10deg) scale(1.5);opacity:0}to{transform:rotate(-10deg) scale(1);opacity:1}}
+    @keyframes packet{0%{left:-45%}100%{left:110%}}
+    @keyframes packetV{0%{top:-55%}100%{top:110%}}
+    @keyframes pulse{0%,100%{transform:scale(1)}45%{transform:scale(1.025)}}
+
+    /* ---------- Responsive ---------- */
+    @media(max-width:1180px){
+      .workspace{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .panel-verify{grid-column:1/-1}
+      .panel-verify .panel-inner{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 28px}
+      .panel-verify .panel-desc{grid-column:1/-1;min-height:0}
+      .panel-verify .verify-box{margin-top:0}
+      .hero{grid-template-columns:minmax(0,1fr) 260px}
+    }
+    @media(max-width:860px){
+      .shell{width:min(100% - 36px,640px)}
+      .hero{grid-template-columns:1fr;padding:34px 0 62px}
+      .rosette-wrap{display:none}
+      .hero p{font-size:19px}
+      .steps{grid-template-columns:1fr;margin-top:-30px}
+      .step{border-left:0;border-top:1px solid var(--line2);padding:16px 20px}
+      .step:first-child{border-top:0}
+      .features{grid-template-columns:1fr;gap:16px}
+      .workspace{grid-template-columns:1fr}
+      .panel-verify .panel-inner{display:block}
+      .panel-verify .verify-box{margin-top:20px}
+      .panel-desc{min-height:0}
+      .trust-lab{padding:20px}
+      .lab-heading{display:block}.lab-heading .status-pill{margin-top:12px}
+      .trust-flow{grid-template-columns:1fr;gap:8px}
+      .flow-line{width:4px;height:26px;margin:auto}
+      .flow-line:after{left:0;right:0;top:-55%;bottom:auto;width:100%;height:55%;background:linear-gradient(transparent,var(--teal),transparent)}
+      .trust-lab.flowing .flow-line:after{animation:packetV 1s ease-in-out infinite}
+      .flow-caption{flex-direction:column;gap:2px}
+      .timeline{padding:20px}
+      .timeline-head{align-items:flex-start}
+      .timeline-track{grid-template-columns:1fr;gap:18px}
+      .timeline-event{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:14px;padding:0}
+      .timeline-event:not(:last-child):after{left:12px;right:auto;top:30px;bottom:-18px;border-top:0;border-left:3px dotted var(--line)}
+      .event-dot{grid-row:1/4;margin:0}
+      .foot{flex-direction:column;align-items:flex-start;gap:4px}
+    }
+    @media(max-width:520px){
+      body{font-size:17px}
+      .brand-caption{display:none}
+      .brand-name{font-size:24px}
+      .live-pill{font-size:14px;padding:7px 12px}
+      .hero h1{letter-spacing:-2px}
+      .panel-top{padding:16px 18px}
+      .panel-inner{padding:18px}
+      .panel h2{font-size:23px}
+      .btn-row{flex-direction:column}
+      .cert-grid{grid-template-columns:78px minmax(0,1fr)}
+    }
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+  <div class="band">
+    <div class="shell">
+      <nav class="topbar" aria-label="Main header">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 19 6v5c0 4.7-2.9 7.9-7 10-4.1-2.1-7-5.3-7-10V6l7-3Z" stroke="#e6c777"/><path d="m8.5 12 2.2 2.2 4.8-5" stroke="#7fd0c2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div class="brand-name">SigDesk <span>Nova</span></div><div class="brand-caption">Digital trust laboratory</div></div>
+        </div>
+        <div class="top-right"><div class="live-pill" id="systemStatus"><span class="dot"></span><span id="systemStatusText">Awaiting setup</span></div></div>
+      </nav>
+      <header class="hero">
+        <div>
+          <h1>Trust, signed.</h1>
+          <p>Explore how a certificate authority establishes identity, how <b>Aditya</b> signs a message, and how <b>Anushka</b> verifies its authenticity, all in one interactive workspace.</p>
+        </div>
+        <figure class="rosette-wrap"><svg class="rosette" viewBox="-200 -200 400 400" aria-hidden="true" focusable="false">
+<defs><ellipse id="e1" rx="176" ry="64"/><ellipse id="e2" rx="120" ry="40"/><ellipse id="e3" rx="70" ry="22"/></defs>
+<g fill="none" stroke-width=".9">
+<g stroke="#e6c777" opacity=".6"><use href="#e1" transform="rotate(0.00)"/><use href="#e1" transform="rotate(6.00)"/><use href="#e1" transform="rotate(12.00)"/><use href="#e1" transform="rotate(18.00)"/><use href="#e1" transform="rotate(24.00)"/><use href="#e1" transform="rotate(30.00)"/><use href="#e1" transform="rotate(36.00)"/><use href="#e1" transform="rotate(42.00)"/><use href="#e1" transform="rotate(48.00)"/><use href="#e1" transform="rotate(54.00)"/><use href="#e1" transform="rotate(60.00)"/><use href="#e1" transform="rotate(66.00)"/><use href="#e1" transform="rotate(72.00)"/><use href="#e1" transform="rotate(78.00)"/><use href="#e1" transform="rotate(84.00)"/><use href="#e1" transform="rotate(90.00)"/><use href="#e1" transform="rotate(96.00)"/><use href="#e1" transform="rotate(102.00)"/><use href="#e1" transform="rotate(108.00)"/><use href="#e1" transform="rotate(114.00)"/><use href="#e1" transform="rotate(120.00)"/><use href="#e1" transform="rotate(126.00)"/><use href="#e1" transform="rotate(132.00)"/><use href="#e1" transform="rotate(138.00)"/><use href="#e1" transform="rotate(144.00)"/><use href="#e1" transform="rotate(150.00)"/><use href="#e1" transform="rotate(156.00)"/><use href="#e1" transform="rotate(162.00)"/><use href="#e1" transform="rotate(168.00)"/><use href="#e1" transform="rotate(174.00)"/></g>
+<g stroke="#7fd0c2" opacity=".55"><use href="#e2" transform="rotate(0.00)"/><use href="#e2" transform="rotate(7.50)"/><use href="#e2" transform="rotate(15.00)"/><use href="#e2" transform="rotate(22.50)"/><use href="#e2" transform="rotate(30.00)"/><use href="#e2" transform="rotate(37.50)"/><use href="#e2" transform="rotate(45.00)"/><use href="#e2" transform="rotate(52.50)"/><use href="#e2" transform="rotate(60.00)"/><use href="#e2" transform="rotate(67.50)"/><use href="#e2" transform="rotate(75.00)"/><use href="#e2" transform="rotate(82.50)"/><use href="#e2" transform="rotate(90.00)"/><use href="#e2" transform="rotate(97.50)"/><use href="#e2" transform="rotate(105.00)"/><use href="#e2" transform="rotate(112.50)"/><use href="#e2" transform="rotate(120.00)"/><use href="#e2" transform="rotate(127.50)"/><use href="#e2" transform="rotate(135.00)"/><use href="#e2" transform="rotate(142.50)"/><use href="#e2" transform="rotate(150.00)"/><use href="#e2" transform="rotate(157.50)"/><use href="#e2" transform="rotate(165.00)"/><use href="#e2" transform="rotate(172.50)"/></g>
+<g stroke="#e6c777" opacity=".7"><use href="#e3" transform="rotate(0.00)"/><use href="#e3" transform="rotate(10.00)"/><use href="#e3" transform="rotate(20.00)"/><use href="#e3" transform="rotate(30.00)"/><use href="#e3" transform="rotate(40.00)"/><use href="#e3" transform="rotate(50.00)"/><use href="#e3" transform="rotate(60.00)"/><use href="#e3" transform="rotate(70.00)"/><use href="#e3" transform="rotate(80.00)"/><use href="#e3" transform="rotate(90.00)"/><use href="#e3" transform="rotate(100.00)"/><use href="#e3" transform="rotate(110.00)"/><use href="#e3" transform="rotate(120.00)"/><use href="#e3" transform="rotate(130.00)"/><use href="#e3" transform="rotate(140.00)"/><use href="#e3" transform="rotate(150.00)"/><use href="#e3" transform="rotate(160.00)"/><use href="#e3" transform="rotate(170.00)"/></g>
+<circle r="190" stroke="#e6c777" opacity=".8" stroke-width="1.4"/><circle r="184" stroke="#7fd0c2" opacity=".6"/>
+</g>
+<circle r="64" fill="#0d2b2a" stroke="#e6c777" stroke-width="1.6"/><circle r="58" fill="none" stroke="#7fd0c2" stroke-width=".8" opacity=".7"/>
+<text y="-4" text-anchor="middle" fill="#fbfcfa" font-family="Bricolage Grotesque,system-ui,sans-serif" font-weight="700" font-size="21">RSA-PSS</text>
+<text y="19" text-anchor="middle" fill="#e6c777" font-family="Figtree,system-ui,sans-serif" font-weight="600" font-size="14">SHA-256</text>
+</svg><figcaption>Signature algorithm</figcaption></figure>
+      </header>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="steps" aria-label="Workflow steps">
+      <div class="step active" id="step1"><div class="step-num">1</div><div><strong>Establish trust</strong><small>Create CA + certificate</small></div></div>
+      <div class="step" id="step2"><div class="step-num">2</div><div><strong>Sign message</strong><small>Hash + private key</small></div></div>
+      <div class="step" id="step3"><div class="step-num">3</div><div><strong>Verify integrity</strong><small>Certificate + signature</small></div></div>
+    </div>
+
+    <section class="features" aria-label="Security features">
+      <div class="feature"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 19 6v5c0 4.7-2.9 7.9-7 10-4.1-2.1-7-5.3-7-10V6l7-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>Certificate-backed identity</strong><small>X.509 trust chain validation</small></span></div>
+      <div class="feature"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="4" y="11" width="16" height="10" rx="2"/><path d="m9 16 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>Private-key signing</strong><small>RSA-PSS with SHA-256</small></span></div>
+      <div class="feature"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 12a8 8 0 1 0 2.3-5.6L4 8.5"/><path d="M4 4v4.5h4.5M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>Integrity verification</strong><small>Detect message tampering</small></span></div>
+    </section>
+
+    <section class="trust-lab" id="trustLab" aria-labelledby="trustLabTitle">
+      <div class="lab-heading"><div><h2 id="trustLabTitle">Follow the chain of trust</h2><p>Watch identity, signing and integrity checks connect as you run the demo.</p></div><span class="status-pill" id="flowStatus">System idle</span></div>
+      <div class="trust-flow" aria-label="Certificate authority to Aditya to Anushka data flow">
+        <div class="trust-node" id="nodeCA"><span class="trust-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 19 6v5c0 4.7-2.9 7.9-7 10-4.1-2.1-7-5.3-7-10V6l7-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>Certificate Authority</strong><small>Issues Aditya's identity</small></span></div>
+        <div class="flow-line" aria-hidden="true"></div>
+        <div class="trust-node" id="nodeAditya"><span class="trust-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m14 6 4 4M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1 4 20Z"/></svg></span><span><strong>Aditya · Sign</strong><small>SHA-256 + private key</small></span></div>
+        <div class="flow-line" aria-hidden="true"></div>
+        <div class="trust-node" id="nodeAnushka"><span class="trust-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M7.5 10.5l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>Anushka · Verify</strong><small>Certificate + signature</small></span></div>
+      </div>
+      <div class="flow-caption"><span>Trusted issuer</span><span>Private-key operation</span><span>Public-key verification</span></div>
+    </section>
+
+    <main class="workspace">
+      <section class="panel" aria-labelledby="caTitle">
+        <div class="panel-top"><div class="panel-title"><div class="panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 19 6v5c0 4.7-2.9 7.9-7 10-4.1-2.1-7-5.3-7-10V6l7-3Z"/><path d="M9 12h6M12 9v6" stroke-linecap="round"/></svg></div><div><div class="panel-index">Step 1</div><h2 id="caTitle">Certificate authority</h2></div></div><span class="status-pill" id="caStatus">Not set</span></div>
+        <div class="panel-inner">
+          <p class="panel-desc">Create a trusted root CA, then issue Aditya a certificate that binds her identity to her public key.</p>
+          <button class="btn btn-primary btn-full" id="setup" style="margin-top:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 19 6v5c0 4.7-2.9 7.9-7 10-4.1-2.1-7-5.3-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Create CA &amp; certificate</span></button>
+          <div class="error" id="err1" role="alert"></div>
+          <div id="certs" class="cert-stack"><div class="empty-state"><div><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3" stroke-linecap="round"/></svg></div><strong>No certificates yet</strong><p>Create the CA to generate the root and Aditya's certificate.</p></div></div></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="signTitle">
+        <div class="panel-top"><div class="panel-title"><div class="panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m14 6 4 4M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1 4 20Z"/><path d="M13 20h7" stroke-linecap="round"/></svg></div><div><div class="panel-index">Step 2</div><h2 id="signTitle">Aditya signs</h2></div></div><span class="status-pill" id="signStatus">No signature</span></div>
+        <div class="panel-inner">
+          <p class="panel-desc">Aditya hashes her message with SHA-256 and signs that hash using her private key.</p>
+          <label class="field-label" for="msg">Message to sign <span id="charCount">35 chars</span></label>
+          <textarea id="msg" aria-label="Message to sign" maxlength="4000">Transfer Rs. 10,000 to Account 12345</textarea>
+          <button class="btn btn-primary btn-full" id="sign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="4" y="11" width="16" height="10" rx="2"/><path d="m9 16 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign message</span></button>
+          <div class="error" id="err2" role="alert"></div>
+          <div id="signout" class="output hide">
+            <div class="panel-divider"></div>
+            <div class="output-head"><label class="field-label">SHA-256 message hash</label><span class="mini-tag">digest</span></div>
+            <div class="mono hash" id="hash"></div>
+            <div class="output-head" style="margin-top:18px"><label class="field-label">Digital signature</label><span class="mini-tag"><span id="sbytes"></span> bytes · RSA-PSS</span></div>
+            <div class="mono" id="sig"></div>
+            <div class="helper">The signature is generated by the Flask backend.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-verify" aria-labelledby="verifyTitle">
+        <div class="panel-top"><div class="panel-title"><div class="panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M7.5 10.5l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div class="panel-index">Step 3</div><h2 id="verifyTitle">Anushka verifies</h2></div></div><span class="status-pill" id="verifyStatus">Awaiting message</span></div>
+        <div class="panel-inner">
+          <p class="panel-desc">Anushka validates the certificate chain first, then checks whether the received message matches Aditya's signature.</p>
+          <div class="verify-column">
+            <label class="field-label" for="rx">Message received <span>Anushka's copy</span></label>
+            <textarea id="rx" aria-label="Message received by Anushka" placeholder="Sign a message first. It will appear here."></textarea>
+            <label class="check-label"><input type="checkbox" id="forge"><span><strong>Simulate a rogue CA</strong><br>Use a forged certificate to demonstrate why the issuer must be trusted.</span></label>
+            <div class="btn-row"><button class="btn btn-primary" id="verify"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Verify</button><button class="btn btn-secondary" id="tamper">Simulate tampering</button></div>
+            <button class="btn btn-quiet btn-full" id="restore">Restore signed message</button>
+            <div class="error" id="err3" role="alert"></div>
+          </div>
+          <div class="results-column">
+            <div class="verify-box">
+              <div class="result-top"><span class="field-label" style="margin:0">Verification result</span><span class="tag">Live check</span></div>
+              <div class="empty-state" id="verifyEmpty"><div><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg></div><strong>Ready when you are</strong><p>Sign a message, then verify it to see each trust check.</p></div></div>
+              <div class="seal" id="seal"><div><span id="stext"></span><small id="ssub"></small></div></div>
+              <ul class="checks" id="checks"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section class="timeline" aria-labelledby="timelineTitle">
+      <div class="timeline-head"><div><h2 id="timelineTitle">Verification timeline</h2><p>Events update as you interact with the cryptography playground.</p></div><span class="tag" id="timelineCount">0 / 4 events</span></div>
+      <div class="timeline-track">
+        <div class="timeline-event current" id="eventSetup"><span class="event-dot"></span><div><strong>Trust established</strong><small>Generate root CA and Aditya's X.509 certificate.</small><time id="timeSetup">Waiting for setup</time></div></div>
+        <div class="timeline-event" id="eventSign"><span class="event-dot"></span><div><strong>Message signed</strong><small>Hash the message and create its RSA-PSS signature.</small><time id="timeSign">Waiting for signature</time></div></div>
+        <div class="timeline-event" id="eventVerify"><span class="event-dot"></span><div><strong>Integrity checked</strong><small>Validate issuer trust and signature match.</small><time id="timeVerify">Waiting for verification</time></div></div>
+        <div class="timeline-event" id="eventResult"><span class="event-dot"></span><div><strong>Result recorded</strong><small>Accepted or rejected based on the verification checks.</small><time id="timeResult">No result yet</time></div></div>
+      </div>
+    </section>
+
+    <footer class="foot"><div><strong>SigDesk</strong> · Interactive X.509 &amp; digital signature demo</div><div>Educational simulation · Not for real financial transactions</div></footer>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+
+
+const $ = id => document.getElementById(id);
+
+let signed = "", hasSetup = false, hasSignature = false, toastTimer;
+
+async function api(url, body){
+
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{})});
+
+  let d; try { d = await r.json(); } catch { throw new Error("The server returned an unreadable response. Check the Flask terminal."); }
+
+  if(!r.ok) throw new Error(d.error || `Request failed (${r.status}).`); return d;
+
+}
+
+function escapeHTML(value){return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+function notify(message){const t=$("toast");if(!t)return;t.textContent=message;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),3000);}
+
+function setPill(id,text,state=""){const el=$(id);el.textContent=text;el.className="status-pill"+(state?" "+state:"");}
+
+function updateWorkflow(){
+  const step1=$("step1"),step2=$("step2"),step3=$("step3");
+  if(step1)step1.classList.toggle("active",!hasSetup);if(step2)step2.classList.toggle("active",hasSetup&&!hasSignature);if(step3)step3.classList.toggle("active",hasSignature);
+  const sys=$("systemStatus"),sysText=$("systemStatusText");if(sys)sys.classList.toggle("ready",hasSetup);if(sysText)sysText.textContent=hasSignature?"Signature ready":hasSetup?"CA established":"Awaiting setup";
+}
+
+function markEvent(id,timeId,label){const el=$(id);el.classList.add("done");el.classList.remove("current");$(timeId).textContent=label+" · "+new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});updateTimelineCount();}
+
+function updateTimelineCount(){const n=["eventSetup","eventSign","eventVerify","eventResult"].filter(id=>$(id).classList.contains("done")).length;$("timelineCount").textContent=`${n} / 4 events`;}
+
+function animateFlow(stage){const lab=$("trustLab");if(lab)lab.classList.add("flowing");const status=$("flowStatus");if(status)status.textContent=stage;["nodeCA","nodeAditya","nodeAnushka"].forEach((id,i)=>{const n=$(id);if(!n)return;n.classList.toggle("ready",(stage!=="System idle"&&i===0)||(stage!=="System idle"&&stage!=="CA established"&&i===1)||(stage==="Verification running"||stage==="Verification passed"||stage==="Verification rejected")&&i===2);n.classList.remove("pulse");if((stage==="Signing message"&&i===1)||(stage.startsWith("Verification")&&i===2)||(stage==="CA established"&&i===0)){void n.offsetWidth;n.classList.add("pulse");}});if((stage==="Verification passed"||stage==="Verification rejected")&&lab)setTimeout(()=>lab.classList.remove("flowing"),1200);}
+
+function certCard(c,title,cls,file){return `<div class="cert ${cls}"><div class="cert-title">${escapeHTML(title)} <span class="cert-badge">${file==="ca"?"ROOT CA":"X.509"}</span></div><dl class="cert-grid"><dt>Subject</dt><dd>${escapeHTML(c.subject)}</dd><dt>Issuer</dt><dd>${escapeHTML(c.issuer)}</dd><dt>Serial</dt><dd>${escapeHTML(c.serial)}</dd><dt>Validity</dt><dd>${escapeHTML(c.from)} — ${escapeHTML(c.to)}</dd><dt>Algorithm</dt><dd>${escapeHTML(c.algo)}</dd></dl><a class="download" href="/download/${file}" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m-5-5 5 5 5-5M5 17v3h14v-3" stroke-linecap="round" stroke-linejoin="round"/></svg>Download .pem</a></div>`;}
+
+function resetVerification(){const s=$("seal");s.className="seal";$("checks").innerHTML="";$("verifyEmpty").classList.remove("hide");setPill("verifyStatus","Awaiting message");}
+
+$("msg").addEventListener("input",()=>$("charCount").textContent=`${$("msg").value.length} chars`);
+
+$("setup").onclick=async()=>{
+
+  const btn=$("setup");btn.disabled=true;$("err1").textContent="";setPill("caStatus","Generating","busy");
+
+  try{const d=await api("/api/setup");$("certs").innerHTML=certCard(d.ca,"Root CA certificate (self-signed)","ca","ca")+certCard(d.aditya || d.alice,"Aditya's certificate (CA-issued)","","alice");hasSetup=true;hasSignature=false;signed="";$("signout").classList.add("hide");$("rx").value="";$("err2").textContent="";$("err3").textContent="";resetVerification();setPill("caStatus","Trusted CA","good");setPill("signStatus","No signature");markEvent("eventSetup","timeSetup","Created");$("eventSign").classList.remove("done");$("eventSign").classList.add("current");["eventVerify","eventResult"].forEach(id=>$(id).classList.remove("done","current"));$("timeSign").textContent="Waiting for signature";$("timeVerify").textContent="Waiting for verification";$("timeResult").textContent="No result yet";animateFlow("CA established");notify("CA and Aditya's certificate created.");updateWorkflow();}catch(e){$("err1").textContent=e.message;setPill("caStatus","Setup failed","bad");}finally{btn.disabled=false;}
+
+};
+
+$("sign").onclick=async()=>{
+
+  $("err2").textContent="";const btn=$("sign");btn.disabled=true;setPill("signStatus","Signing…","busy");
+
+  try{const d=await api("/api/sign",{message:$("msg").value});signed=$("msg").value;hasSignature=true;$("rx").value=signed;$("hash").textContent=d.hash;$("sig").textContent=d.signature;$("sbytes").textContent=d.bytes;$("signout").classList.remove("hide");resetVerification();setPill("signStatus","Signed","good");markEvent("eventSign","timeSign","Signed");$("eventVerify").classList.add("current");$("eventResult").classList.remove("current","done");$("timeVerify").textContent="Waiting for verification";$("timeResult").textContent="No result yet";animateFlow("Signing message");notify("Message signed successfully.");updateWorkflow();}catch(e){$("err2").textContent=e.message;setPill("signStatus","Signing failed","bad");}finally{btn.disabled=false;}
+
+};
+
+$("tamper").onclick=()=>{const v=$("rx").value;if(!v){$("err3").textContent="Sign a message first, then simulate tampering.";return;}$("rx").value=v.includes("10,000")?v.replace("10,000","90,000"):v+"!";$("err3").textContent="";setPill("verifyStatus","Message changed","bad");$("eventVerify").classList.remove("done");$("eventResult").classList.remove("done");$("eventVerify").classList.add("current");$("timeVerify").textContent="Message changed — verify again";$("timeResult").textContent="No result yet";updateTimelineCount();animateFlow("Message changed");notify("Message changed. Verify it to test integrity.");};
+
+$("restore").onclick=()=>{if(!hasSignature){$("err3").textContent="Sign a message first.";return;}$("rx").value=signed;$("err3").textContent="";resetVerification();notify("Original signed message restored.");};
+
+$("verify").onclick=async()=>{
+
+  $("err3").textContent="";const btn=$("verify");btn.disabled=true;setPill("verifyStatus","Checking…","busy");
+
+  try{const d=await api("/api/verify",{message:$("rx").value,forged:$("forge").checked});const s=$("seal");s.className="seal "+(d.ok?"ok":"no");void s.offsetWidth;s.classList.add("show");$("stext").textContent=d.ok?"VALID":"INVALID";$("ssub").textContent=d.ok?"Signature accepted":"Do not trust this message";$("verifyEmpty").classList.add("hide");$("checks").innerHTML=d.checks.map(c=>`<li><span class="check-mark ${c.ok?"ok":"no"}">${c.ok?"✓":"✕"}</span><strong>${escapeHTML(c.label)}</strong><small>${escapeHTML(c.detail)}</small></li>`).join("");setPill("verifyStatus",d.ok?"Verified":"Verification failed",d.ok?"good":"bad");markEvent("eventVerify","timeVerify","Checked");markEvent("eventResult","timeResult",d.ok?"Accepted":"Rejected");animateFlow(d.ok?"Verification passed":"Verification rejected");notify(d.ok?"Verification passed: certificate and signature checks succeeded.":"Verification failed. Review the checks below.");updateWorkflow();}catch(e){$("err3").textContent=e.message;setPill("verifyStatus","Check failed","bad");}finally{btn.disabled=false;}
+
+};
+
+updateWorkflow();updateTimelineCount();
+
+
+</script>
+</body>
+</html>
